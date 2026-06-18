@@ -109,7 +109,7 @@ For an Electron app bundling a local index, the realistic field narrows fast —
 |-------|---------|--------------------|--------------------|-------|
 | **Orama** ⭐ | Pure TS, zero native deps | Drops in, no config | First-class (`mode: 'hybrid'`) | ~512 MB single-file persistence cap; in-memory model. Production at scale (nodejs.org search) |
 | **sqlite-vec** ⭐ | C ext in SQLite (`.node`) | `asarUnpack` (handled by `@photostructure/sqlite-vec`) | Composable via FTS5 + RRF (manual SQL) | Best if app already ships SQLite (`better-sqlite3`); single `.db` file. Pre-v1 |
-| **LanceDB** | Rust + NAPI `.node` | `asarUnpack`; some documented packaging edge cases | Best-in-class native BM25+vector | Highest performance/scale; 5ire migrated *away* citing complexity; Reor used it |
+| **LanceDB** | Rust + NAPI `.node` | `asarUnpack` (auto via Electron Forge `AutoUnpackNatives`; NAPI-RS needs no per-ABI rebuild) | Best-in-class native BM25+vector | Highest performance/scale; **shipped Electron precedent: Continue.dev** (also AnythingLLM); 5ire migrated *away* citing complexity; Reor used it |
 | **PGlite + pgvector** | WASM Postgres | No native modules (~3 MB) | Manual SQL (`tsvector` + pgvector) | Full Postgres semantics; 5ire migrated *to* it from LanceDB |
 | Vectra / hnswlib-node | Pure TS / C++ | easy / `asarUnpack` | none/partial | Only for small or low-level use |
 
@@ -145,17 +145,23 @@ ship this way — it's "good enough" for a personal vault and fully offline.
 - **Default (offline, EN-leaning):** `bge-small-en-v1.5` via Transformers.js,
   in-process, no Python. Best size/quality tradeoff and matches proven prior art.
 - **For Polish/mixed-language notes (your case):** strongly prefer a **multilingual**
-  model — `jina-embeddings-v3` (MTEB 65.52, multilingual, 8192-token context) is the
-  standout; `bge-m3` or `multilingual-e5-small` are lighter multilingual options. The
-  EN-only bge-small will under-retrieve on Polish prose, so test multilingual early.
-- **Optional local upgrade:** Ollama (`nomic-embed-text`, `mxbai-embed-large 64.68`)
-  for higher quality if the user runs Ollama.
-- **Optional cloud upgrade:** OpenAI `text-embedding-3-small` (used by Mem0/Cognee
-  defaults), Voyage, or Jina's hosted v3.
-- **DeepSeek note:** DeepSeek's API is a chat/completions provider; it does **not**
-  offer a dedicated embeddings endpoint (verify before relying on it). So the
-  generation provider (DeepSeek) and the embedding provider are necessarily separate —
-  design two independent provider slots.
+  model. Best local Apache-licensed multilingual options that run in-process or via
+  Ollama: **`Qwen3-Embedding-0.6B`** (Apache 2.0, ~639 MB, multilingual, 40k context)
+  and **`bge-m3`** (~1.2 GB, multilingual, 8192 context). For cloud,
+  **`jina-embeddings-v3`** (MTEB 65.52, multilingual, 8192 context, OpenAI-compatible)
+  is the standout. The EN-only bge-small will under-retrieve on Polish prose, so test a
+  multilingual model early.
+- **Optional local upgrade:** Ollama (`nomic-embed-text`, `mxbai-embed-large 64.68`,
+  `qwen3-embedding`) for higher quality if the user already runs Ollama. (Ollama can't
+  be a *bundled* default — it requires a separate install — but its `/v1/embeddings`
+  endpoint is OpenAI-compatible, so it slots into the same provider abstraction.)
+- **Optional cloud upgrade:** OpenAI `text-embedding-3-small` (~$0.02/M, $0.01 batch),
+  or Jina v3 (~$0.02/M, multilingual, highest MTEB). Avoid Cohere (512-token cap).
+- **DeepSeek note (confirmed):** DeepSeek's API is chat-only; it offers **no**
+  embeddings endpoint (the `/models` list shows only `deepseek-v4-flash`/`-pro`, and
+  three feature requests were closed as not-planned). So the generation provider
+  (DeepSeek) and the embedding provider are necessarily separate — design two
+  independent provider slots from the start.
 - **Hard constraint:** the *same* embedding model must be used for indexing and
   querying. Switching models = full reindex. Store the model id/version in the index
   and trigger reindex on change.
@@ -275,6 +281,36 @@ Agent surface:     MCP server (search_notes, get_note, read_chunk_neighbors,
 change): the `caption` field in the viz envelope, the separation of generation vs
 embedding provider, the markdown-as-source-of-truth + disposable-index split, and
 storing the embedding-model id in the index.
+
+### Suggested phasing (cheap → only-as-needed)
+
+The research points to a clear sequence that avoids building infrastructure before it
+earns its place:
+
+- **Phase 0 — filesystem MCP + ripgrep.** Expose the `.md` folder to the agent with
+  read + keyword search, no embeddings. For a few-hundred-note vault this often beats
+  RAG (the LLM-wiki pattern) and is near-zero effort. Only hard requirement carried
+  forward: the `caption`-on-viz rule, so the raw files are agent-legible.
+- **Phase 1 — hybrid retrieval.** Add the embedded index (sqlite-vec/Orama),
+  multilingual embeddings, BM25 + vector fused with RRF, and a cross-encoder reranker.
+  Reference architecture: **Obsidian Copilot's three-retriever fanout** (BM25 +
+  lexical + semantic, fused) — the most mature open implementation. Expose via MCP
+  (`search_notes`, `get_note`, `read_chunk_neighbors`).
+- **Phase 1b (cheap, concurrent) — wikilinks as the graph.** On note save, one
+  background LLM call extracts typed observations + `[[wikilinks]]` into the markdown
+  itself (the basic-memory pattern); expose a `build_context` MCP tool that traverses
+  those links. This is "the graph" — stored in the files, git-versioned, no graph DB,
+  and it pre-synthesizes relationships at ingest so multi-hop queries are cheap.
+- **Phase 2 — real graph, only if needed.** When the vault exceeds ~3–5k notes *and*
+  multi-hop queries visibly fail, evaluate **LightRAG** (MIT, ~$0.50/500 pages, local
+  models OK). Skip Microsoft GraphRAG (enterprise-scale cost/complexity) and Cognee
+  (whole-platform overhead) for a single-user app.
+
+Supporting numbers: on the "when to use graphs" benchmark (arXiv 2506.05690), plain
+vector wins single-hop fact retrieval (~83% recall) while graph wins multi-hop /
+summarization (~88–91%); per-query token cost ranges from ~880 (vanilla RAG) to
+~100k (LightRAG) to ~331k (MS-GraphRAG global) — i.e. the graph is not free at query
+time either, which is another reason to defer it.
 
 ## Key links
 
