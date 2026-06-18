@@ -5,8 +5,11 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView } from '@codemirror/view'
 
 const theme = EditorView.theme({
-  '&': { height: '100%', fontSize: '13px' },
-  '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }
+  '&': { height: '100%', fontSize: '14px', background: 'transparent' },
+  '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: '1.7' },
+  '.cm-content': { padding: '24px 28px' },
+  '.cm-gutters': { display: 'none' },
+  '&.cm-focused': { outline: 'none' }
 })
 
 export function Editor({
@@ -27,7 +30,13 @@ export function Editor({
         theme
       ]}
       onChange={onChange}
-      basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true }}
+      basicSetup={{
+        lineNumbers: false,
+        foldGutter: false,
+        highlightActiveLine: false,
+        highlightActiveLineGutter: false,
+        bracketMatching: false
+      }}
     />
   )
 }

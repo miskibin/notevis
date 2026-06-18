@@ -69,13 +69,10 @@ export function App(): JSX.Element {
       <Sidebar notes={notes} activeId={activeId} onSelect={openNote} onCreate={createNote} />
       <main className="main">
         <header className="toolbar">
-          <span className="toolbar__name">{activeId ?? 'Brak notatki'}</span>
-          <span className={'toolbar__status' + (saved ? ' is-saved' : '')}>
-            {saved ? 'zapisano' : 'edytowanie…'}
-          </span>
+          <span className={'dot' + (saved ? ' dot--saved' : '')} title={saved ? 'zapisano' : 'edytowanie…'} />
           <div className="toolbar__spacer" />
-          <button className="btn btn--primary" onClick={() => setGenOpen(true)}>
-            Generuj wizualizację
+          <button className="ghost-btn" onClick={() => setGenOpen(true)}>
+            + wizualizacja
           </button>
         </header>
         <div className="panes">
