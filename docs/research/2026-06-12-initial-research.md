@@ -180,6 +180,12 @@ LLM:          DeepSeek V4-Flash via tool-calling strict mode
 Estimated solo-dev timeline to a polished prototype: **6–10 weeks**, dominated by
 CM6 live-preview edge cases (cursor re-entry, scroll jitter, widget↔source sync).
 
+> **Note:** a second requirement — the notes accumulating into a knowledge base for
+> an AI agent — is covered in a companion doc: `2026-06-12-knowledge-base-for-agent.md`.
+> Its one load-bearing decision (an LLM-written `caption` on every viz block, so the
+> notes are retrievable/agent-legible) should be baked into the `viz` envelope from
+> day one.
+
 ## 8. Strategic question: own app vs. Obsidian plugin first
 
 Honest assessment from the research:
