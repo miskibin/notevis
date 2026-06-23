@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { NoteMeta } from '@shared/api'
 import { Sidebar } from './components/Sidebar'
-import { Editor } from './components/Editor'
-import { Preview } from './components/Preview'
+import { LiveEditor } from './components/LiveEditor'
 import { GenerateDialog } from './components/GenerateDialog'
 
 export function App(): JSX.Element {
@@ -75,13 +74,8 @@ export function App(): JSX.Element {
             + wizualizacja
           </button>
         </header>
-        <div className="panes">
-          <section className="pane pane--editor">
-            <Editor value={content} onChange={onChange} />
-          </section>
-          <section className="pane pane--preview">
-            <Preview content={content} />
-          </section>
+        <div className="surface">
+          <LiveEditor value={content} onChange={onChange} />
         </div>
       </main>
       <GenerateDialog open={genOpen} onClose={() => setGenOpen(false)} onInsert={insertViz} />
