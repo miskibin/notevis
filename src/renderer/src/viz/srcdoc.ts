@@ -60,6 +60,24 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/**
+ * For CDN-backed engines, degrade gracefully: if nothing renders within a few
+ * seconds (e.g. cdnjs unreachable offline), reveal the caption instead of a
+ * blank frame — the caption is the indexed NL description, so it's a meaningful
+ * fallback.
+ */
+function fallback(spec: VizSpec): string {
+  const msg = spec.caption || 'Nie udało się załadować wizualizacji (brak połączenia z CDN).'
+  return `<div id="nv-fb" style="display:none;color:#9aa0a6;font-size:13px;line-height:1.5"></div>
+<script>
+(function () {
+  var fb = document.getElementById('nv-fb');
+  fb.textContent = ${JSON.stringify(msg)};
+  setTimeout(function () { if (!document.querySelector('canvas, svg')) fb.style.display = 'block'; }, 2800);
+})();
+</script>`
+}
+
 function body(spec: VizSpec): string {
   switch (spec.engine) {
     case 'html':
@@ -70,14 +88,20 @@ function body(spec: VizSpec): string {
 <script src="${LIB.p5}"></script>
 <script>
 try { ${spec.code} } catch (e) {
-  document.body.innerHTML = '<pre class="viz-error">' + String(e) + '</pre>';
+  var fb = document.getElementById('nv-fb'); if (fb) fb.style.display = 'block';
 }
-</script>`
+</script>
+${fallback(spec)}`
 
     case 'mermaid':
       return `<pre class="mermaid">${escapeHtml(spec.code)}</pre>
 <script src="${LIB.mermaid}"></script>
-<script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>`
+<script>
+try { mermaid.initialize({ startOnLoad: true, theme: 'dark' }); } catch (e) {
+  var fb = document.getElementById('nv-fb'); if (fb) fb.style.display = 'block';
+}
+</script>
+${fallback(spec)}`
 
     case 'vega-lite':
       return `<div id="vega-host"></div>
@@ -89,9 +113,10 @@ try {
   var spec = JSON.parse(${JSON.stringify(spec.code)});
   vegaEmbed('#vega-host', spec, { actions: false, theme: 'dark' });
 } catch (e) {
-  document.body.innerHTML = '<pre class="viz-error">' + String(e) + '</pre>';
+  var fb = document.getElementById('nv-fb'); if (fb) fb.style.display = 'block';
 }
-</script>`
+</script>
+${fallback(spec)}`
 
     default:
       return `<pre class="viz-error">unknown engine</pre>`
