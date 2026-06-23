@@ -21,7 +21,10 @@ function buildHidden(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const state = view.state
   const sel = state.selection.main
-  const activeLine = state.doc.lineAt(sel.head).number
+  // When unfocused (just opened / reading), hide ALL markup for a clean page.
+  // While focused, reveal markup on the active line / under the selection only.
+  const focused = view.hasFocus
+  const activeLine = focused ? state.doc.lineAt(sel.head).number : -1
   const vizRegions = findRegions(state)
   const inViz = (from: number, to: number): boolean =>
     vizRegions.some((r) => from <= r.to && to >= r.from)
@@ -35,7 +38,7 @@ function buildHidden(view: EditorView): DecorationSet {
         if (inViz(node.from, node.to)) return
         // Reveal markup on the active line / under the selection.
         if (state.doc.lineAt(node.from).number === activeLine) return
-        if (sel.from <= node.to && sel.to >= node.from) return
+        if (focused && sel.from <= node.to && sel.to >= node.from) return
         // For ATX headings, also swallow the single space after the hashes.
         let end = node.to
         if (node.name === 'HeaderMark' && state.doc.sliceString(end, end + 1) === ' ') end += 1
@@ -53,9 +56,41 @@ export const livePreview = ViewPlugin.fromClass(
       this.decorations = buildHidden(view)
     }
     update(u: ViewUpdate): void {
-      if (u.docChanged || u.selectionSet || u.viewportChanged) {
+      if (u.docChanged || u.selectionSet || u.viewportChanged || u.focusChanged) {
         this.decorations = buildHidden(u.view)
       }
+    }
+  },
+  { decorations: (v) => v.decorations }
+)
+
+/** Add a class to heading lines so they get vertical breathing room (CSS). */
+function buildHeadings(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>()
+  const state = view.state
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        const m = /^ATXHeading(\d)$/.exec(node.name)
+        if (!m) return
+        const line = state.doc.lineAt(node.from)
+        builder.add(line.from, line.from, Decoration.line({ class: `cm-h${m[1]}` }))
+      }
+    })
+  }
+  return builder.finish()
+}
+
+export const headingLines = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet
+    constructor(view: EditorView) {
+      this.decorations = buildHeadings(view)
+    }
+    update(u: ViewUpdate): void {
+      if (u.docChanged || u.viewportChanged) this.decorations = buildHeadings(u.view)
     }
   },
   { decorations: (v) => v.decorations }

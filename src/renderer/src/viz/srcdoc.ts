@@ -66,9 +66,10 @@ function escapeHtml(s: string): string {
  * blank frame — the caption is the indexed NL description, so it's a meaningful
  * fallback.
  */
-function fallback(spec: VizSpec): string {
-  const msg = spec.caption || 'Nie udało się załadować wizualizacji (brak połączenia z CDN).'
-  return `<div id="nv-fb" style="display:none;color:#9aa0a6;font-size:13px;line-height:1.5"></div>
+function fallback(_spec: VizSpec): string {
+  // Short notice only — the full caption is already shown below the frame.
+  const msg = '⚠ Ta wizualizacja wymaga połączenia z internetem (cdnjs).'
+  return `<div id="nv-fb" style="display:none;color:#8a8a8a;font-size:12px;line-height:1.5"></div>
 <script>
 (function () {
   var fb = document.getElementById('nv-fb');

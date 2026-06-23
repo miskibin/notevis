@@ -5,7 +5,7 @@ import { languages } from '@codemirror/language-data'
 import { EditorView } from '@codemirror/view'
 import { editorTheme, mdHighlight } from '../editor/theme'
 import { vizWidgets } from '../editor/vizWidget'
-import { livePreview } from '../editor/livePreview'
+import { livePreview, headingLines } from '../editor/livePreview'
 
 /**
  * A single editing surface (Notion-style): markdown stays editable text with
@@ -25,7 +25,8 @@ export function LiveEditor({
       editorTheme,
       mdHighlight,
       vizWidgets,
-      livePreview
+      livePreview,
+      headingLines
     ],
     []
   )

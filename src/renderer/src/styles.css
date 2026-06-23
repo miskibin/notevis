@@ -131,6 +131,22 @@ body {
   overflow: hidden;
 }
 
+/* Heading vertical rhythm (classes added by the headingLines plugin) */
+.cm-h1 {
+  padding-top: 10px;
+}
+.cm-h2 {
+  padding-top: 30px;
+}
+.cm-h3 {
+  padding-top: 20px;
+}
+.cm-h4,
+.cm-h5,
+.cm-h6 {
+  padding-top: 14px;
+}
+
 /* Inline viz widget inside the editor surface (borderless) */
 .cm-viz {
   margin: 22px 0;
